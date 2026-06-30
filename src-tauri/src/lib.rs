@@ -49,10 +49,10 @@ pub struct AppSettings {
 }
 
 #[tauri::command]
-fn check_environment() -> EnvironmentStatus {
-    let node_version = run_shell_capture("node --version").ok().map(clean_output);
+async fn check_environment() -> EnvironmentStatus {
+    let node_version = run_shell_capture_blocking("node --version".to_string()).await.ok().map(clean_output);
     let node_major = node_version.as_deref().and_then(parse_node_major_version);
-    let ccusage_version = run_shell_capture("ccusage --version").ok().map(clean_output);
+    let ccusage_version = run_shell_capture_blocking("ccusage --version".to_string()).await.ok().map(clean_output);
 
     EnvironmentStatus {
         node_installed: node_version.is_some(),
@@ -65,8 +65,8 @@ fn check_environment() -> EnvironmentStatus {
 }
 
 #[tauri::command]
-fn install_ccusage() -> Result<InstallResult, String> {
-    let output = run_shell("npm install -g ccusage")?;
+async fn install_ccusage() -> Result<InstallResult, String> {
+    let output = run_shell_blocking("npm install -g ccusage".to_string()).await?;
 
     Ok(InstallResult {
         success: output.status.success(),
@@ -76,18 +76,18 @@ fn install_ccusage() -> Result<InstallResult, String> {
 }
 
 #[tauri::command]
-fn list_supported_tools() -> Result<Vec<AiTool>, String> {
-    let help_text = run_shell_capture("ccusage --help")?;
+async fn list_supported_tools() -> Result<Vec<AiTool>, String> {
+    let help_text = run_shell_capture_blocking("ccusage --help".to_string()).await?;
     Ok(parse_supported_tools(&help_text))
 }
 
 #[tauri::command]
-fn load_usage(tool: String, since: String) -> Result<Value, String> {
+async fn load_usage(tool: String, since: String) -> Result<Value, String> {
     validate_tool_id(&tool)?;
     validate_since(&since)?;
 
     let command = format!("ccusage {} session --since {} --json", tool, since);
-    let stdout = run_shell_capture(&command)?;
+    let stdout = run_shell_capture_blocking(command).await?;
     let mut report: Value = serde_json::from_str(&stdout).map_err(|error| {
         format!("Failed to parse ccusage JSON output: {error}")
     })?;
@@ -139,13 +139,20 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn run_shell_capture(script: &str) -> Result<String, String> {
-    let output = run_shell(script)?;
+async fn run_shell_capture_blocking(script: String) -> Result<String, String> {
+    let output = run_shell_blocking(script).await?;
     if !output.status.success() {
         return Err(clean_output(String::from_utf8_lossy(&output.stderr).to_string()));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+async fn run_shell_blocking(script: String) -> Result<std::process::Output, String> {
+    let script_for_error = script.clone();
+    tauri::async_runtime::spawn_blocking(move || run_shell(&script))
+        .await
+        .map_err(|error| format!("Failed to join command `{script_for_error}`: {error}"))?
 }
 
 fn run_shell(script: &str) -> Result<std::process::Output, String> {
@@ -512,6 +519,14 @@ mod tests {
         assert!(path.ends_with("/usr/sbin:/sbin"));
 
         let _ = fs::remove_dir_all(home);
+    }
+
+    #[test]
+    fn blocking_shell_capture_can_be_awaited() {
+        let output = tauri::async_runtime::block_on(run_shell_capture_blocking("printf async-ready".to_string()))
+            .expect("run blocking shell command");
+
+        assert_eq!(output, "async-ready");
     }
 
     #[test]
