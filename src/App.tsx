@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -58,7 +58,7 @@ import type {
 const usageCache = createUsageCache(loadUsage);
 const chartColors = ["#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#9333ea"];
 const fallbackTools: AiTool[] = [{ id: "codex", label: "Codex" }];
-const appVersion = "1.0.0";
+const appVersion = "1.1.0";
 type SettingsTab = "general" | "tools" | "about";
 const chartTooltipProps = {
   cursor: false,
@@ -96,6 +96,7 @@ function App() {
     sortKey: "lastActivity",
     sortDirection: "desc",
   });
+  const usageRequestId = useRef(0);
 
   const environmentAction = environment ? getEnvironmentAction(environment) : "node-required";
   const activeTools = useMemo(
@@ -186,17 +187,27 @@ function App() {
       return;
     }
 
+    const requestId = usageRequestId.current + 1;
+    usageRequestId.current = requestId;
     setIsUsageLoading(true);
     setError(null);
 
     try {
       const usage = await usageCache.load(selectedTool.id, since, { refresh });
+      if (requestId !== usageRequestId.current) {
+        return;
+      }
       setRawReport(usage);
     } catch (caught) {
+      if (requestId !== usageRequestId.current) {
+        return;
+      }
       setRawReport(null);
       setError(toErrorMessage(caught));
     } finally {
-      setIsUsageLoading(false);
+      if (requestId === usageRequestId.current) {
+        setIsUsageLoading(false);
+      }
     }
   }
 
@@ -302,14 +313,6 @@ function App() {
     );
   }
 
-  if (isUsageLoading) {
-    return (
-      <main className="usage-loading-screen">
-        <UsageLoadingPanel label={usageLoadingLabel} progressLabel={t(language, "usageLoadingAria")} />
-      </main>
-    );
-  }
-
   return (
     <main className="app-shell">
       <aside className="tool-rail">
@@ -329,10 +332,6 @@ function App() {
             </button>
           ))}
         </nav>
-        <button className="icon-text-button rail-settings" onClick={() => setIsSettingsOpen(true)} type="button">
-          <Settings size={16} aria-hidden="true" />
-          {t(language, "settings")}
-        </button>
       </aside>
 
       <section className="workspace">
@@ -363,6 +362,15 @@ function App() {
             >
               <RefreshCw className={isUsageLoading ? "spin" : ""} size={18} aria-hidden="true" />
             </button>
+            <button
+              aria-label={t(language, "settings")}
+              className="icon-button"
+              onClick={() => setIsSettingsOpen(true)}
+              title={t(language, "settings")}
+              type="button"
+            >
+              <Settings size={18} aria-hidden="true" />
+            </button>
           </div>
         </header>
 
@@ -387,26 +395,30 @@ function App() {
           />
         ) : environmentAction === "install-ccusage" ? (
           <InstallPanel isInstalling={isInstalling} language={language} onInstall={handleInstallCcusage} />
-        ) : isUsageLoading ? (
-          <UsageLoadingPanel label={usageLoadingLabel} progressLabel={t(language, "usageLoadingAria")} />
         ) : (
           <>
-                <section className="summary-grid">
+                <section className="summary-grid" aria-busy={isUsageLoading}>
                   {summaryCards.map((card) => (
                     <article className={`summary-card ${card.tone}`} key={card.id}>
                       <span>{card.label}</span>
-                      <div className="summary-value-row">
-                        <strong>{card.value}</strong>
-                        {card.millionValue ? <span className="million-badge">{card.millionValue}</span> : null}
-                      </div>
-                      {card.id === "cache" ? (
-                        <small>
-                          {t(language, "cacheBreakdown", {
-                            create: formatInteger(report.summary.cacheCreationTokens),
-                            read: formatInteger(report.summary.cacheReadTokens),
-                          })}
-                        </small>
-                      ) : null}
+                      {isUsageLoading ? (
+                        <SummaryCardLoading progressLabel={t(language, "usageLoadingAria")} />
+                      ) : (
+                        <>
+                          <div className="summary-value-row">
+                            <strong>{card.value}</strong>
+                            {card.millionValue ? <span className="million-badge">{card.millionValue}</span> : null}
+                          </div>
+                          {card.id === "cache" ? (
+                            <small>
+                              {t(language, "cacheBreakdown", {
+                                create: formatInteger(report.summary.cacheCreationTokens),
+                                read: formatInteger(report.summary.cacheReadTokens),
+                              })}
+                            </small>
+                          ) : null}
+                        </>
+                      )}
                     </article>
                   ))}
                 </section>
@@ -417,8 +429,10 @@ function App() {
                       <h2>{t(language, "dailyTrend")}</h2>
                       <span>{since}</span>
                     </div>
-                    <div className="chart-frame" role={trendData.length > 0 ? "img" : undefined} aria-label={trendData.length > 0 ? t(language, "dailyTrendBarChart") : undefined}>
-                      {trendData.length > 0 ? (
+                    <div className="chart-frame" role={!isUsageLoading && trendData.length > 0 ? "img" : undefined} aria-label={!isUsageLoading && trendData.length > 0 ? t(language, "dailyTrendBarChart") : undefined}>
+                      {isUsageLoading ? (
+                        <PanelLoading label={usageLoadingLabel} progressLabel={t(language, "usageLoadingAria")} />
+                      ) : trendData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                           <BarChart data={trendData} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -456,7 +470,9 @@ function App() {
                       </div>
                     </div>
                     <div className="chart-frame">
-                      {modelTokenData.length > 0 ? (
+                      {isUsageLoading ? (
+                        <PanelLoading label={usageLoadingLabel} progressLabel={t(language, "usageLoadingAria")} />
+                      ) : modelTokenData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                           <PieChart>
                             <Pie
@@ -479,7 +495,7 @@ function App() {
                       )}
                     </div>
                     <div className="composition-legend model-token-legend">
-                      {modelTokenData.map((item, index) => (
+                      {isUsageLoading ? null : modelTokenData.map((item, index) => (
                         <span key={item.name}>
                           <i style={{ background: chartColors[index % chartColors.length] }} />
                           {item.name}
@@ -530,7 +546,13 @@ function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {visibleRows.map((session) => (
+                        {isUsageLoading ? (
+                          <tr className="table-loading-row">
+                            <td colSpan={6}>
+                              <TableLoading label={usageLoadingLabel} progressLabel={t(language, "usageLoadingAria")} />
+                            </td>
+                          </tr>
+                        ) : visibleRows.map((session) => (
                           <tr key={session.sessionId}>
                             <td>
                               <code>{session.sessionId}</code>
@@ -554,7 +576,7 @@ function App() {
                         ))}
                       </tbody>
                     </table>
-                    {visibleRows.length === 0 ? <EmptyState label={t(language, "noSessions")} /> : null}
+                    {!isUsageLoading && visibleRows.length === 0 ? <EmptyState label={t(language, "noSessions")} /> : null}
                   </div>
                 </section>
           </>
@@ -803,14 +825,42 @@ function SettingsBlock({
   );
 }
 
-function UsageLoadingPanel({ label, progressLabel }: { label: string; progressLabel: string }) {
+function SummaryCardLoading({ progressLabel }: { progressLabel: string }) {
   return (
-    <div className="usage-loading-panel">
-      <div>
-        <Loader2 className="spin" size={28} aria-hidden="true" />
-        <h2>{label}</h2>
+    <div className="summary-card-loading">
+      <i />
+      <i />
+      <div aria-label={progressLabel} className="loading-progress compact" role="progressbar" />
+    </div>
+  );
+}
+
+function PanelLoading({ label, progressLabel }: { label: string; progressLabel: string }) {
+  return (
+    <div className="panel-loading" role="status">
+      <Loader2 className="spin" size={20} aria-hidden="true" />
+      <span>{label}</span>
+      <div aria-label={progressLabel} className="loading-progress compact" role="progressbar" />
+    </div>
+  );
+}
+
+function TableLoading({ label, progressLabel }: { label: string; progressLabel: string }) {
+  return (
+    <div className="table-loading" role="status">
+      <div className="table-loading-heading">
+        <Loader2 className="spin" size={18} aria-hidden="true" />
+        <span>{label}</span>
       </div>
-      <div aria-label={progressLabel} className="loading-progress" role="progressbar" />
+      <div aria-label={progressLabel} className="loading-progress compact" role="progressbar" />
+      {Array.from({ length: 4 }).map((_, rowIndex) => (
+        <div className="table-loading-line" key={rowIndex}>
+          <i />
+          <i />
+          <i />
+          <i />
+        </div>
+      ))}
     </div>
   );
 }

@@ -144,7 +144,7 @@ describe("App dashboard", () => {
     expect(screen.getByText("25.52M")).not.toBeNull();
   });
 
-  it("shows a friendly loading state while usage data is loading", async () => {
+  it("keeps navigation visible and scopes loading while usage data is loading", async () => {
     let resolveUsage: (value: RawUsageReport) => void = () => {};
     apiMocks.getSettings.mockResolvedValue({
       ...defaultSettings,
@@ -158,16 +158,17 @@ describe("App dashboard", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("正在加载 Codex 数据")).not.toBeNull();
-    expect(screen.getByRole("progressbar", { name: "正在加载使用数据" })).not.toBeNull();
-    expect(screen.queryByRole("button", { name: "当天" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Codex" })).toBeNull();
+    expect((await screen.findAllByText("正在加载 Codex 数据")).length).toBeGreaterThan(1);
+    expect(screen.getAllByRole("progressbar", { name: "正在加载使用数据" }).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "当天" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Codex" })).not.toBeNull();
+    expect(document.querySelector(".usage-loading-screen")).toBeNull();
 
     resolveUsage(usageReport);
     await screen.findByRole("heading", { name: "会话" });
   });
 
-  it("replaces stale dashboard data with a loading page when changing time range", async () => {
+  it("keeps page controls available while changing time range", async () => {
     let resolveNextUsage: (value: RawUsageReport) => void = () => {};
     apiMocks.getSettings.mockResolvedValue({
       ...defaultSettings,
@@ -186,17 +187,18 @@ describe("App dashboard", () => {
     expect(await screen.findByText("codex-6f78aa")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "最近 3 天" }));
 
-    expect(await screen.findByText("正在加载 Codex 数据")).not.toBeNull();
-    expect(screen.getByRole("progressbar", { name: "正在加载使用数据" })).not.toBeNull();
-    expect(screen.queryByText("codex-6f78aa")).toBeNull();
-    expect(screen.queryByRole("button", { name: "最近 3 天" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Codex" })).toBeNull();
+    expect((await screen.findAllByText("正在加载 Codex 数据")).length).toBeGreaterThan(1);
+    expect(screen.getAllByRole("progressbar", { name: "正在加载使用数据" }).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "最近 3 天" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Codex" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "设置" })).not.toBeNull();
+    expect(document.querySelector(".usage-loading-screen")).toBeNull();
 
     resolveNextUsage(millionUsageReport);
     expect(await screen.findByText("rollout-2026-06-29T09-39")).not.toBeNull();
   });
 
-  it("shows a blank loading page when refreshing data", async () => {
+  it("keeps page controls available while refreshing data", async () => {
     let resolveRefresh: (value: RawUsageReport) => void = () => {};
     apiMocks.getSettings.mockResolvedValue({
       ...defaultSettings,
@@ -217,16 +219,18 @@ describe("App dashboard", () => {
     expect(await screen.findByText("codex-6f78aa")).not.toBeNull();
     fireEvent.click(screen.getByTitle("刷新数据"));
 
-    expect(await screen.findByText("正在加载 Gemini 数据")).not.toBeNull();
-    expect(screen.queryByText("codex-6f78aa")).toBeNull();
-    expect(screen.queryByRole("button", { name: "当天" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Gemini" })).toBeNull();
+    expect((await screen.findAllByText("正在加载 Gemini 数据")).length).toBeGreaterThan(1);
+    expect(screen.getAllByRole("progressbar", { name: "正在加载使用数据" }).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "当天" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Gemini" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "设置" })).not.toBeNull();
+    expect(document.querySelector(".usage-loading-screen")).toBeNull();
 
     resolveRefresh(millionUsageReport);
     expect(await screen.findByText("rollout-2026-06-29T09-39")).not.toBeNull();
   });
 
-  it("shows a blank loading page when switching AI tools", async () => {
+  it("keeps page controls available while switching AI tools", async () => {
     let resolveNextToolUsage: (value: RawUsageReport) => void = () => {};
     apiMocks.getSettings.mockResolvedValue({
       ...defaultSettings,
@@ -246,10 +250,12 @@ describe("App dashboard", () => {
     expect(await screen.findByText("codex-6f78aa")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Gemini" }));
 
-    expect(await screen.findByText("正在加载 Gemini 数据")).not.toBeNull();
-    expect(screen.queryByText("codex-6f78aa")).toBeNull();
-    expect(screen.queryByRole("button", { name: "当天" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Gemini" })).toBeNull();
+    expect((await screen.findAllByText("正在加载 Gemini 数据")).length).toBeGreaterThan(1);
+    expect(screen.getAllByRole("progressbar", { name: "正在加载使用数据" }).length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: "当天" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Gemini" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "设置" })).not.toBeNull();
+    expect(document.querySelector(".usage-loading-screen")).toBeNull();
 
     resolveNextToolUsage(millionUsageReport);
     expect(await screen.findByText("rollout-2026-06-29T09-39")).not.toBeNull();
@@ -257,6 +263,19 @@ describe("App dashboard", () => {
 });
 
 describe("App settings", () => {
+  it("places the settings action in the topbar instead of the tool rail", async () => {
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "会话" });
+
+    const settingsButton = screen.getByRole("button", { name: "设置" });
+    const topbarActions = document.querySelector(".topbar-actions");
+    const toolRail = document.querySelector(".tool-rail");
+
+    expect(topbarActions?.contains(settingsButton)).toBe(true);
+    expect(toolRail?.contains(settingsButton)).toBe(false);
+  });
+
   it("opens settings as a full-page view with tabs and main page display controls", async () => {
     render(<App />);
 

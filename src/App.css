@@ -115,10 +115,6 @@ button:disabled {
   border-color: var(--border);
 }
 
-.rail-settings {
-  margin-top: auto;
-}
-
 .icon-text-button,
 .primary-button {
   display: inline-flex;
@@ -255,46 +251,6 @@ button:disabled {
   border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
 }
 
-.usage-loading-screen {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 22px;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.usage-loading-screen .usage-loading-panel {
-  width: min(720px, 100%);
-}
-
-.usage-loading-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  min-height: 520px;
-  padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--blue) 30%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--blue) 8%, var(--surface));
-  color: var(--text);
-}
-
-.usage-loading-panel > div:first-child {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.usage-loading-panel h2 {
-  margin: 0;
-  font-size: 20px;
-  line-height: 1.25;
-}
-
 .loading-progress {
   position: relative;
   width: min(360px, 100%);
@@ -312,6 +268,12 @@ button:disabled {
   background: var(--blue);
   content: "";
   animation: loading-slide 1.15s ease-in-out infinite;
+}
+
+.loading-progress.compact {
+  width: 100%;
+  max-width: 260px;
+  height: 3px;
 }
 
 .summary-grid {
@@ -389,6 +351,38 @@ td small {
 
 .summary-card small {
   font-size: 12px;
+}
+
+.summary-card-loading {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  min-height: 64px;
+}
+
+.summary-card-loading i,
+.table-loading-line i {
+  display: block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted) 0%,
+    color-mix(in srgb, var(--blue) 14%, var(--surface-muted)) 45%,
+    var(--surface-muted) 90%
+  );
+  background-size: 220% 100%;
+  animation: loading-pulse 1.35s ease-in-out infinite;
+}
+
+.summary-card-loading i:first-child {
+  width: min(210px, 78%);
+  height: 30px;
+}
+
+.summary-card-loading i:nth-child(2) {
+  width: min(120px, 52%);
+  height: 18px;
 }
 
 .skeleton-card,
@@ -487,6 +481,26 @@ td small {
 .chart-frame {
   width: 100%;
   height: 250px;
+}
+
+.panel-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 210px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.panel-loading span,
+.table-loading-heading span {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .recharts-tooltip-cursor {
@@ -604,6 +618,43 @@ td small {
 .table-scroll {
   overflow-x: auto;
   margin: 0 -16px;
+}
+
+.table-loading-row td {
+  padding: 16px;
+}
+
+.table-loading {
+  display: grid;
+  gap: 12px;
+  min-width: 840px;
+}
+
+.table-loading-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.table-loading .loading-progress {
+  max-width: 320px;
+}
+
+.table-loading-line {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.8fr) repeat(3, minmax(90px, 0.75fr));
+  gap: 18px;
+  align-items: center;
+}
+
+.table-loading-line i {
+  height: 14px;
+  border-radius: 8px;
+}
+
+.table-loading-line i:first-child {
+  height: 18px;
 }
 
 table {
@@ -897,6 +948,16 @@ td small {
 
   100% {
     transform: translateX(250%);
+  }
+}
+
+@keyframes loading-pulse {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
   }
 }
 
